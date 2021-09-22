@@ -45,7 +45,7 @@ export default function useContext(Handler) {
         },
         watchCtx(ctx) {
             const vm = this.vm;
-            const none = ['field', 'value', 'vm', 'template', 'name', 'config', 'control', 'inject', 'sync', 'payload', 'optionsTo'];
+            const none = ['field', 'value', 'vm', 'template', 'name', 'config', 'control', 'inject', 'sync', 'payload', 'optionsTo', 'update'];
             Object.keys(ctx.rule).filter(k => none.indexOf(k) === -1).forEach((key) => {
                 const flag = key === 'children';
                 ctx.watch.push(vm.$watch(() => ctx.rule[key], (n, o) => {
@@ -58,12 +58,15 @@ export default function useContext(Handler) {
                         ctx.link();
                         return;
                     } else if (['props', 'on', 'nativeOn'].indexOf(key) > -1) {
+                        this.parseFn(n || {});
                         this.parseInjectEvent(ctx.rule, n || {});
                         if (key === 'props' && ctx.input) {
                             this.setFormData(ctx, ctx.parser.toFormValue(ctx.rule.value, ctx));
                         }
                     } else if (['emit', 'nativeEmit'].indexOf(key) > -1)
                         this.parseEmit(ctx, key === 'emit');
+                    else if (['prefix', 'suffix'].indexOf(key) > -1)
+                        n && this.loadFn(n, ctx.rule);
                     else if (key === 'type') {
                         ctx.updateType();
                         this.bindParser(ctx);
@@ -104,13 +107,14 @@ export default function useContext(Handler) {
             $del(ctx, 'cacheValue');
 
             const f = this.fieldCtx[field];
+            let flag = false;
 
             if (field && (!f || f === ctx)) {
                 $del(this.formData, field);
                 $del(this.form, field);
                 $del(this.fieldCtx, field);
                 $del(this.subForm, field);
-                this.vm.$nextTick(() => this.vm.$emit('removeField', field, ctx.rule, this.api));
+                flag = true;
             }
             if (name && this.nameCtx[name] === ctx) {
                 $del(this.nameCtx, name);
@@ -135,7 +139,8 @@ export default function useContext(Handler) {
             this.$render.clearCache(ctx);
             ctx.delete();
             this.effect(ctx, 'deleted');
-            this.vm.$nextTick(() => this.vm.$emit('removeRule', ctx.rule, this.api));
+            flag && this.vm.$emit('removeField', field, ctx.rule, this.api);
+            ctx.rule.__ctrl || this.vm.$emit('removeRule', ctx.rule, this.api);
             return ctx;
         },
     })
